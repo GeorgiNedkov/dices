@@ -1,0 +1,7 @@
+dice-image-recognition/
+__pycache__/
+*.pyc
+*.pyo
+data/output
+dist/
+build/
