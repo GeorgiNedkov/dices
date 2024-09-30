@@ -13,6 +13,11 @@ def getView():
     return render_template("index.html")
 
 
+@app.route("/json", methods=["GET"])
+def getViewJson():
+    return render_template("json.html")
+
+
 @app.route("/prediction/image", methods=["POST"])
 def upload_file_i():
     if request.method == "POST":
