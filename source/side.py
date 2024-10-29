@@ -1,4 +1,4 @@
-from source.functions import isCircle
+from source.isCircle import isCircle
 
 
 class Side:
@@ -18,8 +18,7 @@ class Side:
 
         check = True
         for dimension in self.dimensions:
-            errorLevel = isCircle(dimension, self.original)
-            if errorLevel >= 0.9:
+            if not isCircle(dimension, self.original):
                 check = False
 
         if check:

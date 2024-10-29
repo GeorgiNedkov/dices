@@ -48,7 +48,7 @@ def upload_file_j():
         if file.filename == "":
             return "No file selected", 400
         if file:
-            pil_image = Image.open(file.stream).convert("RGB")
+            pil_image = Image.open(file.stream).convert("L")
             cvImage = np.array(pil_image)
             result = detect(cvImage)
 

@@ -8,76 +8,52 @@ from source.dice import Dice
 
 from source.clustering import clustering, distSquare
 
-images = [
-    "2024-05-07_16-17-38_original",
-    "2024-05-07_21-01-54_original",
-    "2024-05-08_10-09-13_original",
-    "2024-05-07_18-23-50_original",
-    "2024-05-09_04-54-21_original",
-    "2024-05-08_08-52-20_original",
-    "2024-05-08_09-12-47_original",
-    "2024-05-07_18-44-44_original",
-    "2024-05-09_06-02-42_original",
-    "2024-05-09_05-55-43_original",
-    "2024-05-08_07-40-01_original",
-    "2024-05-07_16-07-07_original",
-    "2024-05-09_09-34-35_original",
-    "2024-05-09_08-10-37_original",
-    "2024-05-09_09-17-10_original",
-    "2024-05-08_02-57-30_original",
-    "2024-05-09_09-34-35_original",
-]
+from source.images import images, imagesWrong
 
+count = 0
 for imageName in images:
+    count += 1
+    print(count)
     writeToFile = True
-    outputFolder = f"../data/output/{imageName}"
+    outputFolder = f"./data/output/{imageName}"
     Path(outputFolder).mkdir(parents=True, exist_ok=True)
     diceWidth = 35
 
-    original = cv.imread(f"../data/original/{imageName}.png")
+    original = cv.imread(f"./newData/{imageName}", cv.IMREAD_GRAYSCALE)
     assert original is not None, "file could not be read"
 
     img = original.copy()
 
-    height, width, channels = img.shape
+    height, width = img.shape
     ringCenter = (250, 325)
     radius = 150
+    radiusSquared = radius**2
+    center_y, center_x = (250, 325)
+    Y, X = np.ogrid[:height, :width]
+    distance_from_center = (X - center_x) ** 2 + (Y - center_y) ** 2
+    mask = distance_from_center >= radiusSquared
+    img[mask] = 0
 
-    for y in range(0, height):
-        for x in range(0, width):
-            dist = distSquare(ringCenter, (y, x))
-            if dist > radius * radius:
-                img[y, x] = [0, 0, 0]
-
-    if writeToFile:
-        cv.imwrite(f"../data/out/{imageName}.png", img)
-        cv.imwrite(f"{outputFolder}/cutout.png", img)
-
-    radAndSomeMore = radius + 100
-    crop = img[
-        ringCenter[0] - radAndSomeMore : ringCenter[0] + radAndSomeMore,
-        ringCenter[1] - radAndSomeMore : ringCenter[1] + radAndSomeMore,
-    ]
+    edges = cv.Canny(img, 100, 100)
+    cv.imwrite(f"{outputFolder}/edges.png", edges)
 
     onlyWhite = img.copy()
 
-    for y in range(0, height):
-        for x in range(0, width):
-            if onlyWhite[y, x, 0] <= 240:
-                onlyWhite[y, x] = [0, 0, 0]
-            else:
-                onlyWhite[y, x] = [255, 255, 255]
+    non_white_mask = onlyWhite <= 250
+    reverse_mask = ~non_white_mask
+    # Set all non-white pixels to black (0)
+    onlyWhite[non_white_mask] = 0
+    onlyWhite[reverse_mask] = 255
 
     if writeToFile:
         cv.imwrite(f"{outputFolder}/whitePixels.png", onlyWhite)
 
-    # %%
     # [ 254, 100, 12, ...]
     sectorsCounts = [0]
     # [0,1,0,4,4,4,0,0,0,1...]
-    imgSectorMap = np.zeros((height, width), dtype=np.uint8)
+    imgSectorMap = np.zeros((height, width), dtype=np.uint16)
     # [0,1,0,0,0,0 ...]
-    isPixelChecked = np.zeros((height, width), dtype=np.uint8)
+    isPixelChecked = np.zeros((height, width), dtype=np.bool)
     # [[y,x, sector], ...]
     sectorsByPixels = []
 
@@ -99,7 +75,7 @@ for imageName in images:
                 continue
 
             if isPixelChecked[y, x] == 0:
-                if onlyWhite[y, x, 0] == 255:
+                if onlyWhite[y, x] == 255:
                     isPixelChecked[y, x] = 1
                     imgSectorMap[y, x] = number
                     sectorsByPixels.append([y, x, number])
@@ -112,7 +88,7 @@ for imageName in images:
 
     for y in range(0, height):
         for x in range(0, width):
-            if onlyWhite[y, x, 0] >= 254 and imgSectorMap[y, x] == 0:
+            if onlyWhite[y, x] >= 254 and imgSectorMap[y, x] == 0:
                 sectorsCounts.append(0)
                 findSector(y, x, len(sectorsCounts) - 1)
 
@@ -131,13 +107,13 @@ for imageName in images:
         if sector == 0:
             continue
 
-        if sector <= 20 or sector >= 100:
+        if sector <= 15 or sector >= 100:
             for x_y_sector_arr in sectorsByPixels:
                 s = x_y_sector_arr[2]
                 if s == index:
                     y = x_y_sector_arr[0]
                     x = x_y_sector_arr[1]
-                    onlyWhite[y, x] = [0, 0, 0]
+                    onlyWhite[y, x] = 0
         else:
             validDots.append([])
             for x_y_sector_arr in sectorsByPixels:
@@ -159,23 +135,32 @@ for imageName in images:
             h = ymax - ymin + 1
             cx = xmin + w / 2
             cy = ymin + h / 2
-            sectorDimensions[index] = [ymin, xmin, h, w, cy, cx]
 
-    def myFunc(x):
+            if w > 20 or h > 20:
+                for x_y_sector_arr in sectorsByPixels:
+                    s = x_y_sector_arr[2]
+                    if s == index:
+                        y = x_y_sector_arr[0]
+                        x = x_y_sector_arr[1]
+                        onlyWhite[y, x] = 0
+            else:
+                sectorDimensions[index] = [ymin, xmin, h, w, cy, cx]
+
+    def filterEmpty(x):
         if x[2] == 0:
             return False
         if x[3] == 0:
             return False
         return True
 
-    sectorDimensions = list(filter(myFunc, sectorDimensions))
+    sectorDimensions = list(filter(filterEmpty, sectorDimensions))
 
     if writeToFile:
         cv.imwrite(f"{outputFolder}/dots.png", onlyWhite)
 
     spaceBetweenDots = math.floor(diceWidth / 2)
     sidesClusters = clustering(sectorDimensions, spaceBetweenDots, diceWidth)
-    diceClusters = clustering(sectorDimensions, spaceBetweenDots, diceWidth + 10)
+    diceClusters = clustering(sectorDimensions, spaceBetweenDots, diceWidth + 20)
 
     dices: list[Dice] = list(map(lambda x: Dice(), range(len(diceClusters))))
 
@@ -226,8 +211,8 @@ for imageName in images:
                 dice.value = validSide.value
 
     tmpImage = original.copy()
-    index = 0
-    for dice in dices:
+    tmpOutText = ""
+    for index, dice in enumerate(dices):
         cy, cx = dice.center
         rcx = math.floor(cx)
         rcy = math.floor(cy)
@@ -243,6 +228,7 @@ for imageName in images:
                 2,
                 cv.LINE_4,
             )
+            tmpOutText += f" {dice.value} "
         else:
             cv.putText(
                 tmpImage,
@@ -255,6 +241,44 @@ for imageName in images:
                 cv.LINE_4,
             )
 
+            tmpOutText += " IN "
+
     if writeToFile:
         tmpImage = np.concatenate((original, tmpImage), axis=0)
         cv.imwrite(f"{outputFolder}/score.png", tmpImage)
+
+    tmpImg = np.zeros((500, 500, 3), dtype=np.uint8)
+    for p in sidesClusters[1]:
+        tmpImg = cv.circle(
+            tmpImg, (math.floor(p[1]), math.floor(p[0])), 5, (255, 255, 255), -1
+        )
+
+    tmpImg = np.zeros((height, width, 3), dtype=np.uint8)
+    for dimension in sectorDimensions:
+        y, x, h, w, cy, cx = dimension
+        if w == 0:
+            continue
+        if h == 0:
+            continue
+
+        padding = 3
+        for i in range(math.floor(y - padding), math.floor(y + h + padding + 1)):
+            for j in range(math.floor(x - padding), math.floor(x + w + padding + 1)):
+                tmpImg[i, j] = original[i, j].copy()
+
+    if writeToFile:
+        cv.imwrite(f"{outputFolder}/dices_colored.png", tmpImg)
+
+    img = cv.putText(
+        img,
+        tmpOutText,
+        (20, 200),
+        cv.FONT_HERSHEY_SIMPLEX,
+        1,
+        (255, 255, 0),
+        2,
+        cv.LINE_4,
+    )
+
+    if writeToFile:
+        cv.imwrite(f"{outputFolder}/aaaaaaaaaa.png", img)

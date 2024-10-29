@@ -7,3 +7,6 @@ dist/
 build/
 data/
 data copy/
+newData/
+images/
+**/*.zip
