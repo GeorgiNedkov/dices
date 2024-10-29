@@ -96,6 +96,7 @@ def isCircle(dimension, original: cv.typing.MatLike):
         minDistances
     )
 
+    # print(errorLevel)
     return errorLevel <= 0
 
 
