@@ -7,18 +7,12 @@ def isCircle(dimension, original: cv.typing.MatLike):
     errorLevel = 0
     y, x, h, w, cy, cx = dimension
     padding = 0
+
     tmpImg = original[
         y - padding : y + h + padding, x - padding : x + w + padding
     ].copy()
 
     theight, twidth = tmpImg.shape
-
-    for i in range(0, theight):
-        for j in range(0, twidth):
-            if tmpImg[i, j] > 250:
-                tmpImg[i, j] = 255
-            else:
-                tmpImg[i, j] = 0
 
     isPixelChecked = np.zeros((theight, twidth), dtype=np.uint8)
 
@@ -64,7 +58,7 @@ def isCircle(dimension, original: cv.typing.MatLike):
 
     # print("w: ", w, " h: ", h, " cx: ", cx, " cy: ", cy)
 
-    if w < 6 or h < 6:
+    if w < 5 or h < 5:
         return False
 
     if w - h < -2 or w - h > 2:
@@ -102,7 +96,6 @@ def isCircle(dimension, original: cv.typing.MatLike):
         minDistances
     )
 
-    # print(errorLevel)
     return errorLevel <= 0
 
 
