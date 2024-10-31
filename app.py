@@ -3,7 +3,7 @@ from PIL import Image
 from io import BytesIO
 import cv2 as cv
 import numpy as np
-from source.detect import detect
+from source.detect_2 import detect
 
 app = Flask(__name__)
 

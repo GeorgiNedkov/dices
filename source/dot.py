@@ -7,8 +7,11 @@ class Dot:
     w = 0
     h = 0
 
+    arr: list
+
     def __init__(self, pixels):
         self.pixels = pixels
+        self.arr = []
 
     def calc(self):
         if len(self.pixels) == 0:

@@ -61,7 +61,7 @@ def isCircle(dimension, original: cv.typing.MatLike):
     if w < 5 or h < 5:
         return False
 
-    if w - h < -2 or w - h > 2:
+    if w - h < -3 or w - h > 3:
         return False
 
     minDistances = [99999, 99999]
