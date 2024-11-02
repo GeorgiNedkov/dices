@@ -6,6 +6,7 @@ class Dot:
     y = 0
     w = 0
     h = 0
+    index = 0
 
     arr: list
 

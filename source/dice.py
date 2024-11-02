@@ -1,18 +1,14 @@
-from source.side import Side
+from source.dot import Dot
 
 
 class Dice:
-    sides: list[Side]
-    isValid: bool = False
-    value: int = -1
+    dots: list[Dot]
+    center: list
 
-    def __init__(self):
-        self.sides = []
+    def __init__(self, dots: list[Dot], point: list):
+        self.dots = dots
+        self.center = point
 
     @property
-    def center(self):
-        cxs = list(map(lambda side: side.center[1], self.sides))
-        cys = list(map(lambda side: side.center[0], self.sides))
-        cx = sum(cxs) / len(cxs)
-        cy = sum(cys) / len(cys)
-        return [cy, cx]
+    def value(self):
+        return len(self.dots)

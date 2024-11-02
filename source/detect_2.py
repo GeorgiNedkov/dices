@@ -1,14 +1,16 @@
 import numpy as np
 import cv2 as cv
 import math
+from itertools import combinations
 
 from source.dot import Dot
+from source.dice import Dice
 from source.isCircle import isCircle
 from source.clustering import distSquare
 
 
 def detect(original: cv.typing.MatLike):
-    diceWidth = 40
+    diceWidth = 45
 
     def crop_ring(image, crop_width, crop_height, center):
         center_y, center_x = center
@@ -87,13 +89,13 @@ def detect(original: cv.typing.MatLike):
 
     validDots = []
 
-    for dot in dots:
+    for index, dot in enumerate(dots):
         dot.calc()
 
     for dot in dots:
         pixelsLen = len(dot.pixels)
 
-        if pixelsLen <= 15 or pixelsLen > 100:
+        if pixelsLen <= 20 or pixelsLen > 100:
             for pixel in dot.pixels:
                 y, x = pixel
                 onlyWhite[y, x] = 0
@@ -107,6 +109,9 @@ def detect(original: cv.typing.MatLike):
 
         validDots.append(dot)
 
+    for index, dot in enumerate(dots):
+        dot.index = index
+
     dots = validDots
     validDots = []
 
@@ -114,15 +119,12 @@ def detect(original: cv.typing.MatLike):
         if isCircle(dot.dimension(), onlyWhite):
             validDots.append(dot)
         else:
-
             for pixel in dot.pixels:
                 y, x = pixel
                 onlyWhite[y, x] = 0
 
     dots = validDots
     validDots = []
-
-    tmpImg2 = cv.cvtColor(original, cv.COLOR_GRAY2RGB)
 
     length = len(dots)
 
@@ -196,7 +198,7 @@ def detect(original: cv.typing.MatLike):
 
         return 180 - tolerance <= difference <= 180 + tolerance
 
-    def checkDot(point, onlyWhite, dots: list[Dot]):
+    def checkDot(point, onlyWhite: cv.typing.MatLike, dots: list[Dot]):
         y, x = point
         roundedY = round(y)
         roundedX = round(x)
@@ -206,80 +208,56 @@ def detect(original: cv.typing.MatLike):
         nearDots: list[Dot] = list(
             filter(lambda dot: distSquare(dot.centerPoint, point) < r * r, dots)
         )
+
         # for d in nearDots:
         #     d.printInfo()
 
-        distances = []
         if len(nearDots) == 0:
-            return -1
+            return []
 
         if len(nearDots) % 2 == 0:
             if onlyWhite[roundedY, roundedX] != 0:
-                return -1
+                return []
         else:
             if onlyWhite[roundedY, roundedX] != 255:
-                return -1
+                return []
 
-        for dot in nearDots:
-            distances.append((math.sqrt(distSquare(dot.centerPoint, point)), dot))
+        nearDots.sort(key=lambda d: distSquare(d.centerPoint, point))
+        sectored: list[list[Dot]] = []
 
-        distances = sorted(distances, key=lambda x: x[0])
-        d1 = distances[0]
-        count = 0
-        sectored = [[]]
-        # print(distances)
-        for d2 in distances:
-            if abs(d1[0] - d2[0]) < 2:
-                sectored[count].append(d2)
-                continue
-            sectored.append([d2])
-            count = 1
-            d1 = d2
+        if len(nearDots) == 1:
+            sectored = [[nearDots[0]]]
 
-        countDistances = []
+        if len(nearDots) == 2:
+            sectored = [[nearDots[0], nearDots[1]]]
 
-        for s in sectored:
-            countDistances.append(len(s))
+        if len(nearDots) == 3:
+            sectored = [[nearDots[0]], [nearDots[1], nearDots[2]]]
 
-        if (
-            countDistances != [1]
-            and countDistances != [2]
-            and countDistances != [1, 2]
-            and countDistances != [4]
-            and countDistances != [2, 2]
-            and countDistances != [1, 4]
-            and countDistances != [1, 2, 2]
-            and countDistances != [2, 4]
-            and countDistances != [2, 2, 2]
-        ):
-            if len(distances) == 4:
-                countDistances = [4]
-                sectored = [[distances[0], distances[1], distances[2], distances[3]]]
-            if len(distances) == 5:
-                countDistances = [1, 4]
-                sectored = [
-                    [distances[0]],
-                    [distances[1], distances[2], distances[3], distances[4]],
+        if len(nearDots) == 4:
+            sectored = [[nearDots[0], nearDots[1], nearDots[2], nearDots[3]]]
+        if len(nearDots) == 5:
+            sectored = [
+                [nearDots[0]],
+                [nearDots[1], nearDots[2], nearDots[3], nearDots[4]],
+            ]
+        if len(nearDots) == 6:
+            sectored = [
+                [
+                    nearDots[0],
+                    nearDots[1],
+                    nearDots[2],
+                    nearDots[3],
+                    nearDots[4],
+                    nearDots[5],
                 ]
-            if len(distances) == 6:
-                countDistances = [6]
-                sectored = [
-                    [
-                        distances[0],
-                        distances[1],
-                        distances[2],
-                        distances[3],
-                        distances[4],
-                        distances[5],
-                    ]
-                ]
+            ]
 
         for s in sectored:
             if len(s) <= 1:
                 continue
             angles = [
-                find_angle_between_points(point, item[1].centerPoint) % 360
-                for item in s
+                find_angle_between_points(point, dot.centerPoint) % 360 for dot in s
             ]
             countChecks = 0
             for index1, angle1 in enumerate(angles):
@@ -292,188 +270,71 @@ def detect(original: cv.typing.MatLike):
 
                 countChecks += check
             if countChecks != len(s) / 2:
-                return -1
+                return []
 
-        if countDistances == [1]:
-            return 1
-        if countDistances == [2]:
-            return 2
-        if countDistances == [1, 2]:
-            return 3
-        if countDistances == [4]:
-            return 4
-        if countDistances == [2, 2]:
-            return 4
-        if countDistances == [1, 4]:
-            return 5
-        if countDistances == [1, 2, 2]:
-            return 5
-        if countDistances == [2, 4]:
-            return 6
-        if countDistances == [2, 2, 2]:
-            return 6
-        if countDistances == [6]:
-            return 6
-        return -1
+        return nearDots
 
-    valid = []
-    for index, point in enumerate(all):
-        # if index != 14:
-        #     continue
-        dotValue = checkDot(point, onlyWhite, dots)
-        if dotValue != -1:
-            valid.append((dotValue, index, point))
-            color = (0, 0, 255)
-            y, x = point
-            roundedY = round(y)
-            roundedX = round(x)
-            tmpImg2 = cv.circle(tmpImg2, (roundedX, roundedY), 1, color, -1)
+    valid: list[Dice] = []
+    allDots: list[Dot] = []
+    for point in all:
+        nearDots = checkDot(point, onlyWhite, dots)
 
-    tmpImg2 = cv.cvtColor(original, cv.COLOR_GRAY2RGB)
-    isInvalid = False
+        if len(nearDots) != 0:
+            valid.append(Dice(nearDots, point))
+            allDots += nearDots
 
-    i = 0
-    while i < len(valid):
-        v1, _, p1 = valid[i]
-        j = i + 1
-        while j < len(valid):
-            v2, _, p2 = valid[j]
-            if distSquare(p1, p2) <= 16 and v1 == v2:
-                valid.pop(j)
-                j -= 1
-            j += 1
-        i += 1
+    dots = list(set(allDots))
 
-    valid = sorted(valid, key=lambda x: -x[0])
-    i = 0
-    while i < len(valid):
-        v1, _, p1 = valid[i]
-        j = i + 1
-        r = diceWidth / 2
-        while j < len(valid):
-            v2, _, p2 = valid[j]
-            if distSquare(p1, p2) < r * r:
-                if v1 == v2:
-                    isInvalid = True
-                if v1 > v2:
-                    valid.pop(j)
-                    j -= 1
-            j += 1
-        i += 1
+    def checkDices(dices: list[Dice], dots: list[Dot]):
+        value = 0
+        for d in dices:
+            value += d.value
 
-    for index, v in enumerate(valid):
-        v, i, p = valid[index]
-        color = (0, 0, 255)
-        y, x = p
-        roundedY = round(y)
-        roundedX = round(x)
+        if value != len(dots):
+            return False
 
-        tmpImg2 = cv.circle(tmpImg2, (roundedX, roundedY), 3, color, -1)
+        dicesDots = []
 
-    tmpImg2 = cv.cvtColor(original, cv.COLOR_GRAY2RGB)
+        for d in dices:
+            dicesDots += d.dots
 
-    tmpValid = valid.copy()
-    tmpValid = sorted(tmpValid, key=lambda x: x[2][0])
+        return len(list(set(dicesDots))) == len(dots)
 
-    validFiltered = set()
-    popFront = True
+    filtered: list[list[Dice]] = []
 
-    for d in dots:
-        d.arr = []
+    def findValue():
+        filtered = [
+            combo for combo in combinations(valid, 2) if checkDices(combo, dots)
+        ]
+        filtered = [
+            [element.value for element in inner_list] for inner_list in filtered
+        ]
+        if len(filtered) != 0:
+            filtered = sorted(filtered, key=lambda arr: max(arr), reverse=True)
+            return filtered[0]
 
-    i = 0
-    while i < len(valid):
-        r = diceWidth / 2
-        v, _, p = valid[i]
+        filtered = [
+            combo for combo in combinations(valid, 3) if checkDices(combo, dots)
+        ]
 
-        def filterFunc(dot: Dot):
-            return distSquare(p, dot.centerPoint) < r * r
+        if len(filtered) == 0:
+            return []
 
-        nearDots: list[Dot] = list(filter(filterFunc, dots))
-        for d in nearDots:
-            d.arr.append(i)
+        filtered = [
+            [element.value for element in inner_list] for inner_list in filtered
+        ]
+        filtered = [sorted(inner_list, reverse=True) for inner_list in filtered]
+        filtered = sorted(filtered, key=lambda x: (x[0], x[1]), reverse=True)
 
-        i += 1
+        return filtered[0]
 
-    def sortByX(d: Dot):
-        return d.centerPoint[1]
+    def returnJson(vales: list):
+        isValid = len(vales) == 3
+        result = list(map(lambda v: f"{v}", vales))
 
-    def sortByY(d: Dot):
-        return d.centerPoint[0]
-
-    dots = sorted(dots, key=sortByX)
-
-    if len(dots[0].arr) == 1:
-
-        validFiltered.add(valid[dots[0].arr[0]])
-    if len(dots[-1].arr) == 1:
-
-        validFiltered.add(valid[dots[-1].arr[0]])
-
-    dots = sorted(dots, key=sortByY)
-    if len(dots[0].arr) == 1:
-
-        validFiltered.add(valid[dots[0].arr[0]])
-    if len(dots[-1].arr) == 1:
-
-        validFiltered.add(valid[dots[-1].arr[0]])
-
-    validFiltered = list(validFiltered)
-    for d in dots:
-        d.arr = []
-
-    i = 0
-    while i < len(validFiltered):
-        r = diceWidth / 2
-        v, _, p = validFiltered[i]
-
-        def filterFunc(dot: Dot):
-            return distSquare(p, dot.centerPoint) < r * r
-
-        nearDots: list[Dot] = list(filter(filterFunc, dots))
-
-        for d in nearDots:
-            d.arr.append(i)
-
-        i += 1
-
-    i = 0
-    while i < len(valid):
-        v, _, p = valid[i]
-
-        def filterFunc(dot: Dot):
-            return distSquare(p, dot.centerPoint) < r * r
-
-        nearDots: list[Dot] = list(filter(filterFunc, dots))
-        check = False
-        for d in nearDots:
-            if len(d.arr) != 0:
-                check = True
-        if check:
-            valid.pop(i)
-            continue
-
-        i += 1
-
-    valid = valid + validFiltered
-
-    for index, v in enumerate(valid):
-        v, i, p = valid[index]
-        color = (0, 0, 255)
-        y, x = p
-        roundedY = round(y)
-        roundedX = round(x)
-
-        tmpImg2 = cv.circle(tmpImg2, (roundedX, roundedY), 3, color, -1)
-
-    result = list(
-        map(
-            lambda v: f"{v[0]}",
-            valid,
-        )
-    )
+        return {"isValid": isValid, "value": result}
 
     return {
-        "image": np.concatenate((original, img), axis=0),
-        "json": {"isValid": not isInvalid, "value": result},
+        "image": img,
+        "json": returnJson(findValue()),
     }
