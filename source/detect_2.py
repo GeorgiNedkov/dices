@@ -6,7 +6,7 @@ from itertools import combinations
 from source.dot import Dot
 from source.dice import Dice
 from source.isCircle import isCircle
-from source.clustering import distSquare
+from source.functions import distSquare
 
 
 def detect(original: cv.typing.MatLike):
