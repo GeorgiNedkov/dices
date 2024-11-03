@@ -3,4 +3,4 @@ services:
     build:
       context: .
     ports:
-      - 31415:31415
+      - 8080:8080
