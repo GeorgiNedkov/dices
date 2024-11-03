@@ -5,3 +5,9 @@ __pycache__/
 data/output
 dist/
 build/
+data/
+data copy/
+newData/
+images/
+**/*.zip
+.venv

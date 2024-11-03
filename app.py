@@ -3,7 +3,7 @@ from PIL import Image
 from io import BytesIO
 import cv2 as cv
 import numpy as np
-from source.detect import detect
+from source.detect_2 import detect
 
 app = Flask(__name__)
 
@@ -11,11 +11,6 @@ app = Flask(__name__)
 @app.route("/", methods=["GET"])
 def getView():
     return render_template("index.html")
-
-
-@app.route("/json", methods=["GET"])
-def getViewJson():
-    return render_template("json.html")
 
 
 @app.route("/prediction/image", methods=["POST"])
@@ -53,7 +48,7 @@ def upload_file_j():
         if file.filename == "":
             return "No file selected", 400
         if file:
-            pil_image = Image.open(file.stream).convert("RGB")
+            pil_image = Image.open(file.stream).convert("L")
             cvImage = np.array(pil_image)
             result = detect(cvImage)
 
@@ -63,5 +58,7 @@ def upload_file_j():
 
 if __name__ == "__main__":
     from waitress import serve
+
+    print("listening")
 
     serve(app, host="0.0.0.0", port=31415)
