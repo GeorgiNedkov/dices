@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, send_file
-from PIL import Image
 from io import BytesIO
 import cv2 as cv
 import numpy as np
@@ -22,20 +21,23 @@ def upload_file_i():
         if file.filename == "":
             return "No file selected", 400
         if file:
-            pil_image = Image.open(file.stream).convert("RGB")
-            cvImage = np.array(pil_image)
+            file_bytes = np.frombuffer(file.stream.read(), np.uint8)
+            cvImage = cv.imdecode(file_bytes, cv.IMREAD_GRAYSCALE)
             cvImage = detect(cvImage)["image"]
 
-            im_pil = Image.fromarray(cvImage)
-            img_io = BytesIO()
-            im_pil.save(img_io, "PNG")
+            success, encoded_image = cv.imencode('.png', cvImage)
+            if not success:
+                raise ValueError("Failed to encode image")
+
+            img_io = BytesIO(encoded_image.tobytes())
             img_io.seek(0)
+            
             # return send_file(img_io, mimetype='image/png')  # Change download in separatre browser tab
             return send_file(
                 img_io,
                 mimetype="image/png",
                 as_attachment=True,
-                download_name="_rmbg.png",
+                download_name=f"{file.filename}_result.png",
             )
 
 
@@ -48,9 +50,12 @@ def upload_file_j():
         if file.filename == "":
             return "No file selected", 400
         if file:
-            pil_image = Image.open(file.stream).convert("L")
-            cvImage = np.array(pil_image)
+            print("start")
+            file_bytes = np.frombuffer(file.stream.read(), np.uint8)
+            cvImage = cv.imdecode(file_bytes, cv.IMREAD_GRAYSCALE)
+
             result = detect(cvImage)
+            print("end")
 
             # return send_file(img_io, mimetype='image/png')  # Change download in separatre browser tab
             return result["json"]
@@ -59,4 +64,4 @@ def upload_file_j():
 if __name__ == "__main__":
     from waitress import serve
 
-    serve(app, host="0.0.0.0", port=31415)
+    serve(app, host="0.0.0.0", port=8080, threads=8)
