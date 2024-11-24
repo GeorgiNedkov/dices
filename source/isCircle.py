@@ -96,8 +96,7 @@ def isCircle(dimension, original: cv.typing.MatLike):
         minDistances
     )
 
-    # print(errorLevel)
-    return errorLevel <= 0
+    return errorLevel <= 0.5
 
 
 def findSector(startingY, startingX, height, width, isPixelChecked, onlyWhite):

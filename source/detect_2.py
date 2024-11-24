@@ -43,7 +43,7 @@ def detect(original: cv.typing.MatLike):
 
     onlyWhite = img.copy()
 
-    non_white_mask = onlyWhite <= 250
+    non_white_mask = onlyWhite <= 240
     reverse_mask = ~non_white_mask
     # Set all non-white pixels to black (0)
     onlyWhite[non_white_mask] = 0
@@ -95,7 +95,7 @@ def detect(original: cv.typing.MatLike):
     for dot in dots:
         pixelsLen = len(dot.pixels)
 
-        if pixelsLen <= 20 or pixelsLen > 100:
+        if pixelsLen <= 15 or pixelsLen > 100:
             for pixel in dot.pixels:
                 y, x = pixel
                 onlyWhite[y, x] = 0
@@ -113,18 +113,22 @@ def detect(original: cv.typing.MatLike):
         dot.index = index
 
     dots = validDots
-    validDots = []
+    validDots: list[Dot] = []
+    invalidDots: list[Dot] = []
 
     for dot in dots:
         if isCircle(dot.dimension(), onlyWhite):
             validDots.append(dot)
         else:
+            invalidDots.append(dot)
             for pixel in dot.pixels:
                 y, x = pixel
                 onlyWhite[y, x] = 0
 
     dots = validDots
     validDots = []
+
+    tmpImg2 = cv.cvtColor(original, cv.COLOR_GRAY2RGB)
 
     length = len(dots)
 
@@ -215,6 +219,9 @@ def detect(original: cv.typing.MatLike):
         if len(nearDots) == 0:
             return []
 
+        if len(nearDots) > 6:
+            return []
+
         if len(nearDots) % 2 == 0:
             if onlyWhite[roundedY, roundedX] != 0:
                 return []
@@ -260,12 +267,18 @@ def detect(original: cv.typing.MatLike):
                 find_angle_between_points(point, dot.centerPoint) % 360 for dot in s
             ]
             countChecks = 0
+            alreadyCheckedIndexes = []
             for index1, angle1 in enumerate(angles):
+                if index1 in alreadyCheckedIndexes:
+                    continue
                 check = 0
                 for index2, angle2 in enumerate(angles):
                     if index2 <= index1:
                         continue
+                    if index2 in alreadyCheckedIndexes:
+                        continue
                     if are_opposite_angles(angle1, angle2):
+                        alreadyCheckedIndexes.append(index2)
                         check = 1
 
                 countChecks += check
@@ -277,11 +290,18 @@ def detect(original: cv.typing.MatLike):
     valid: list[Dice] = []
     allDots: list[Dot] = []
     for point in all:
+        # if(index != 9):
+        #     continue
         nearDots = checkDot(point, onlyWhite, dots)
 
         if len(nearDots) != 0:
             valid.append(Dice(nearDots, point))
+            color = (0, 0, 255)
+            y, x = point
+            roundedY = round(y)
+            roundedX = round(x)
             allDots += nearDots
+            tmpImg2 = cv.circle(tmpImg2, (roundedX, roundedY), 1, color, -1)
 
     dots = list(set(allDots))
 
@@ -304,33 +324,69 @@ def detect(original: cv.typing.MatLike):
 
     def findValue():
         filtered = [
-            combo for combo in combinations(valid, 2) if checkDices(combo, dots)
-        ]
-        filtered = [
-            [element.value for element in inner_list] for inner_list in filtered
+            list(combo) for combo in combinations(valid, 2) if checkDices(combo, dots)
         ]
         if len(filtered) != 0:
-            filtered = sorted(filtered, key=lambda arr: max(arr), reverse=True)
+            filtered = [
+                sorted(inner_list, key=lambda x: x.value, reverse=True)
+                for inner_list in filtered
+            ]
+            filtered = sorted(
+                filtered, key=lambda arr: (arr[0].center, arr[1].center), reverse=True
+            )
             return filtered[0]
 
         filtered = [
             combo for combo in combinations(valid, 3) if checkDices(combo, dots)
         ]
 
-        if len(filtered) == 0:
-            return []
+        if len(filtered) != 0:
+            filtered = [
+                sorted(inner_list, key=lambda x: x.value, reverse=True)
+                for inner_list in filtered
+            ]
+            filtered = sorted(
+                filtered,
+                key=lambda x: (x[0].value, x[1].value, x[2].value),
+                reverse=True,
+            )
 
-        filtered = [
-            [element.value for element in inner_list] for inner_list in filtered
-        ]
-        filtered = [sorted(inner_list, reverse=True) for inner_list in filtered]
-        filtered = sorted(filtered, key=lambda x: (x[0], x[1]), reverse=True)
+            return filtered[0]
 
-        return filtered[0]
+        return []
 
-    def returnJson(vales: list):
-        isValid = len(vales) == 3
-        result = list(map(lambda v: f"{v}", vales))
+    def returnJson(dices: list[Dice]):
+        isValid = len(dices) == 3
+        result = list(map(lambda d: f"{d.value}", dices))
+
+        return {"isValid": isValid, "value": result}
+
+    def checkIsValid(invalidDots: list[Dot], dices: list[Dice]):
+        if len(dices) != 3:
+            return False
+
+        for dot in invalidDots:
+            dicesSorted = sorted(
+                dices, key=lambda x: distSquare(x.center, dot.centerPoint)
+            )
+            closesDice = dicesSorted[0]
+
+            dist = distSquare(closesDice.center, dot.centerPoint) ** 0.5
+            if dist > diceWidth * 2 / 3:
+                continue
+
+            center_of_image = (height / 2, width / 2)
+            if (
+                distSquare(center_of_image, closesDice.center) ** 0.5
+                - distSquare(center_of_image, dot.centerPoint) ** 0.5
+                < diceWidth / 2
+            ):
+                return False
+        return True
+
+    def returnJson(dices: list[Dice]):
+        isValid = checkIsValid(invalidDots, dices)
+        result = list(map(lambda d: f"{d.value}", dices))
 
         return {"isValid": isValid, "value": result}
 

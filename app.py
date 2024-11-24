@@ -25,13 +25,13 @@ def upload_file_i():
             cvImage = cv.imdecode(file_bytes, cv.IMREAD_GRAYSCALE)
             cvImage = detect(cvImage)["image"]
 
-            success, encoded_image = cv.imencode('.png', cvImage)
+            success, encoded_image = cv.imencode(".png", cvImage)
             if not success:
                 raise ValueError("Failed to encode image")
 
             img_io = BytesIO(encoded_image.tobytes())
             img_io.seek(0)
-            
+
             # return send_file(img_io, mimetype='image/png')  # Change download in separatre browser tab
             return send_file(
                 img_io,
@@ -50,12 +50,10 @@ def upload_file_j():
         if file.filename == "":
             return "No file selected", 400
         if file:
-            print("start")
             file_bytes = np.frombuffer(file.stream.read(), np.uint8)
             cvImage = cv.imdecode(file_bytes, cv.IMREAD_GRAYSCALE)
 
             result = detect(cvImage)
-            print("end")
 
             # return send_file(img_io, mimetype='image/png')  # Change download in separatre browser tab
             return result["json"]
