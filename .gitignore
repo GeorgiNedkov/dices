@@ -1,13 +1,2 @@
-dice-image-recognition/
-__pycache__/
-*.pyc
-*.pyo
-data/output
-dist/
-build/
-data/
-data copy/
-newData/
-images/
-**/*.zip
-.venv
+/newData
+node_modules

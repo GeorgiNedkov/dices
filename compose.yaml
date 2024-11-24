@@ -1,6 +1,0 @@
-services:
-  server:
-    build:
-      context: .
-    ports:
-      - 31415:31415
