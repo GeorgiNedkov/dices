@@ -50,12 +50,10 @@ def upload_file_j():
         if file.filename == "":
             return "No file selected", 400
         if file:
-            print("start")
             file_bytes = np.frombuffer(file.stream.read(), np.uint8)
             cvImage = cv.imdecode(file_bytes, cv.IMREAD_GRAYSCALE)
 
             result = detect(cvImage)
-            print("end")
 
             # return send_file(img_io, mimetype='image/png')  # Change download in separatre browser tab
             return result["json"]
