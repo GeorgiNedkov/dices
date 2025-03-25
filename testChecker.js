@@ -1,5 +1,5 @@
 const fs = require("fs");
-let fileData = fs.readFileSync("out-old.txt").toString();
+let fileData = fs.readFileSync("./labels/hand-labeled-results.txt").toString();
 let lines = fileData.split("\n").map((line) => line.trim());
 let obj = {};
 
